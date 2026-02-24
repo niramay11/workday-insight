@@ -42,7 +42,7 @@ export function AppSidebar() {
   const items = navItems[role ?? "employee"];
 
   return (
-    <aside className="fixed left-0 top-0 bottom-0 w-64 bg-sidebar-background text-sidebar-foreground flex flex-col z-30">
+    <aside className="hidden md:flex fixed left-0 top-0 bottom-0 w-64 bg-sidebar-background text-sidebar-foreground flex-col z-30">
       {/* Logo */}
       <div className="p-6 flex items-center gap-3">
         <div className="h-9 w-9 rounded-xl bg-primary flex items-center justify-center shrink-0">
