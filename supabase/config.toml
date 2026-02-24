@@ -1,1 +1,7 @@
 project_id = "ratydoxfuyxhapyuvknf"
+
+[functions.agent-api]
+verify_jwt = false
+
+[functions.webhook-receiver]
+verify_jwt = false

@@ -14,6 +14,84 @@ export type Database = {
   }
   public: {
     Tables: {
+      activity_logs: {
+        Row: {
+          action: string
+          created_at: string
+          details: Json | null
+          id: string
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      app_settings: {
+        Row: {
+          id: string
+          key: string
+          updated_at: string
+          value: string
+        }
+        Insert: {
+          id?: string
+          key: string
+          updated_at?: string
+          value: string
+        }
+        Update: {
+          id?: string
+          key?: string
+          updated_at?: string
+          value?: string
+        }
+        Relationships: []
+      }
+      attendance_records: {
+        Row: {
+          created_at: string
+          id: string
+          notes: string | null
+          punch_in: string
+          punch_out: string | null
+          status: string
+          total_hours: number | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          punch_in?: string
+          punch_out?: string | null
+          status?: string
+          total_hours?: number | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          punch_in?: string
+          punch_out?: string | null
+          status?: string
+          total_hours?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       departments: {
         Row: {
           created_at: string
@@ -37,6 +115,44 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      idle_events: {
+        Row: {
+          attendance_id: string
+          duration_minutes: number | null
+          id: string
+          idle_end: string | null
+          idle_start: string
+          source: string
+          user_id: string
+        }
+        Insert: {
+          attendance_id: string
+          duration_minutes?: number | null
+          id?: string
+          idle_end?: string | null
+          idle_start?: string
+          source?: string
+          user_id: string
+        }
+        Update: {
+          attendance_id?: string
+          duration_minutes?: number | null
+          id?: string
+          idle_end?: string | null
+          idle_start?: string
+          source?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "idle_events_attendance_id_fkey"
+            columns: ["attendance_id"]
+            isOneToOne: false
+            referencedRelation: "attendance_records"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -78,6 +194,41 @@ export type Database = {
             columns: ["department_id"]
             isOneToOne: false
             referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      screenshots: {
+        Row: {
+          attendance_id: string
+          captured_at: string
+          id: string
+          image_url: string
+          source: string
+          user_id: string
+        }
+        Insert: {
+          attendance_id: string
+          captured_at?: string
+          id?: string
+          image_url: string
+          source?: string
+          user_id: string
+        }
+        Update: {
+          attendance_id?: string
+          captured_at?: string
+          id?: string
+          image_url?: string
+          source?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "screenshots_attendance_id_fkey"
+            columns: ["attendance_id"]
+            isOneToOne: false
+            referencedRelation: "attendance_records"
             referencedColumns: ["id"]
           },
         ]
