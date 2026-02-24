@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NotificationBell } from "@/components/NotificationBell";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const navItems = {
   employee: [
@@ -96,13 +97,16 @@ export function AppSidebar() {
             <p className="text-xs text-sidebar-muted truncate">{profile?.email}</p>
           </div>
         </div>
-        <button
-          onClick={signOut}
-          className="flex items-center gap-2 text-sm text-sidebar-muted hover:text-destructive transition-colors w-full px-1"
-        >
-          <LogOut className="h-4 w-4" />
-          Sign out
-        </button>
+        <div className="flex items-center justify-between">
+          <button
+            onClick={signOut}
+            className="flex items-center gap-2 text-sm text-sidebar-muted hover:text-destructive transition-colors px-1"
+          >
+            <LogOut className="h-4 w-4" />
+            Sign out
+          </button>
+          <ThemeToggle />
+        </div>
       </div>
     </aside>
   );
