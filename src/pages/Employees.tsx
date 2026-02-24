@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -202,7 +203,9 @@ const Employees = () => {
                           {emp.full_name.charAt(0)}
                         </div>
                         <div>
-                          <p className="font-medium text-sm">{emp.full_name}</p>
+                          <Link to={`/employees/${emp.user_id}`} className="font-medium text-sm hover:text-primary transition-colors">
+                            {emp.full_name}
+                          </Link>
                           <p className="text-xs text-muted-foreground">{emp.email}</p>
                         </div>
                       </div>

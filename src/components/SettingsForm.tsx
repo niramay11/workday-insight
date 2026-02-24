@@ -6,13 +6,15 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
-import { Copy, RefreshCw, Save, Shield, Clock, Eye, EyeOff } from "lucide-react";
+import { Copy, RefreshCw, Save, Shield, Clock, Eye, EyeOff, Camera, Bell } from "lucide-react";
 
 export function SettingsForm() {
   const { role } = useAuth();
   const { settings, updateSetting, regenerateKey } = useSettings();
   const [idleThreshold, setIdleThreshold] = useState("");
   const [expectedHours, setExpectedHours] = useState("");
+  const [screenshotInterval, setScreenshotInterval] = useState("");
+  const [missedPunchTime, setMissedPunchTime] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
   const [showWebhookSecret, setShowWebhookSecret] = useState(false);
 
@@ -21,12 +23,16 @@ export function SettingsForm() {
 
   const currentIdle = idleThreshold || data?.idle_threshold_minutes || "10";
   const currentHours = expectedHours || data?.expected_hours_per_day || "8";
+  const currentScreenshotInterval = screenshotInterval || data?.screenshot_interval_minutes || "5";
+  const currentMissedPunchTime = missedPunchTime || data?.missed_punch_alert_time || "10:00";
 
   const handleSaveGeneral = async () => {
     try {
       await Promise.all([
         updateSetting.mutateAsync({ key: "idle_threshold_minutes", value: currentIdle }),
         updateSetting.mutateAsync({ key: "expected_hours_per_day", value: currentHours }),
+        updateSetting.mutateAsync({ key: "screenshot_interval_minutes", value: currentScreenshotInterval }),
+        updateSetting.mutateAsync({ key: "missed_punch_alert_time", value: currentMissedPunchTime }),
       ]);
       toast({ title: "Settings saved" });
     } catch {
@@ -82,26 +88,25 @@ export function SettingsForm() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Idle Threshold (minutes)</Label>
-              <Input
-                type="number"
-                value={currentIdle}
-                onChange={(e) => setIdleThreshold(e.target.value)}
-                min={1}
-                max={60}
-              />
+              <Input type="number" value={currentIdle} onChange={(e) => setIdleThreshold(e.target.value)} min={1} max={60} />
               <p className="text-xs text-muted-foreground">How long without activity triggers an idle alert</p>
             </div>
             <div className="space-y-2">
               <Label>Expected Hours Per Day</Label>
-              <Input
-                type="number"
-                value={currentHours}
-                onChange={(e) => setExpectedHours(e.target.value)}
-                min={1}
-                max={24}
-                step={0.5}
-              />
+              <Input type="number" value={currentHours} onChange={(e) => setExpectedHours(e.target.value)} min={1} max={24} step={0.5} />
               <p className="text-xs text-muted-foreground">Target daily hours for "full day" status</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1.5"><Camera className="h-3.5 w-3.5" /> Screenshot Interval (minutes)</Label>
+              <Input type="number" value={currentScreenshotInterval} onChange={(e) => setScreenshotInterval(e.target.value)} min={1} max={60} />
+              <p className="text-xs text-muted-foreground">How often the agent captures desktop screenshots</p>
+            </div>
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1.5"><Bell className="h-3.5 w-3.5" /> Missed Punch Alert Time</Label>
+              <Input type="time" value={currentMissedPunchTime} onChange={(e) => setMissedPunchTime(e.target.value)} />
+              <p className="text-xs text-muted-foreground">Alert if employee hasn't punched in by this time</p>
             </div>
           </div>
           <Button onClick={handleSaveGeneral} disabled={updateSetting.isPending}>
@@ -123,35 +128,20 @@ export function SettingsForm() {
             <Label>Agent Endpoint URL</Label>
             <div className="flex gap-2">
               <Input value={agentUrl} readOnly className="font-mono text-xs" />
-              <Button variant="outline" size="icon" onClick={() => copyToClipboard(agentUrl, "Agent URL")}>
-                <Copy className="h-4 w-4" />
-              </Button>
+              <Button variant="outline" size="icon" onClick={() => copyToClipboard(agentUrl, "Agent URL")}><Copy className="h-4 w-4" /></Button>
             </div>
           </div>
           <div className="space-y-2">
             <Label>API Key</Label>
             <div className="flex gap-2">
               <div className="relative flex-1">
-                <Input
-                  value={showApiKey ? (data?.agent_api_key ?? "") : "••••••••••••••••••••••••••••••••"}
-                  readOnly
-                  className="font-mono text-xs pr-10"
-                />
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-0 top-0 h-full"
-                  onClick={() => setShowApiKey(!showApiKey)}
-                >
+                <Input value={showApiKey ? (data?.agent_api_key ?? "") : "••••••••••••••••••••••••••••••••"} readOnly className="font-mono text-xs pr-10" />
+                <Button variant="ghost" size="icon" className="absolute right-0 top-0 h-full" onClick={() => setShowApiKey(!showApiKey)}>
                   {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
               </div>
-              <Button variant="outline" size="icon" onClick={() => copyToClipboard(data?.agent_api_key ?? "", "API Key")}>
-                <Copy className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="icon" onClick={() => handleRegenerate("agent_api_key")}>
-                <RefreshCw className="h-4 w-4" />
-              </Button>
+              <Button variant="outline" size="icon" onClick={() => copyToClipboard(data?.agent_api_key ?? "", "API Key")}><Copy className="h-4 w-4" /></Button>
+              <Button variant="outline" size="icon" onClick={() => handleRegenerate("agent_api_key")}><RefreshCw className="h-4 w-4" /></Button>
             </div>
           </div>
         </CardContent>
@@ -170,36 +160,43 @@ export function SettingsForm() {
             <Label>Webhook URL</Label>
             <div className="flex gap-2">
               <Input value={webhookUrl} readOnly className="font-mono text-xs" />
-              <Button variant="outline" size="icon" onClick={() => copyToClipboard(webhookUrl, "Webhook URL")}>
-                <Copy className="h-4 w-4" />
-              </Button>
+              <Button variant="outline" size="icon" onClick={() => copyToClipboard(webhookUrl, "Webhook URL")}><Copy className="h-4 w-4" /></Button>
             </div>
           </div>
           <div className="space-y-2">
             <Label>Webhook Secret</Label>
             <div className="flex gap-2">
               <div className="relative flex-1">
-                <Input
-                  value={showWebhookSecret ? (data?.webhook_secret ?? "") : "••••••••••••••••••••••••••••••••"}
-                  readOnly
-                  className="font-mono text-xs pr-10"
-                />
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-0 top-0 h-full"
-                  onClick={() => setShowWebhookSecret(!showWebhookSecret)}
-                >
+                <Input value={showWebhookSecret ? (data?.webhook_secret ?? "") : "••••••••••••••••••••••••••••••••"} readOnly className="font-mono text-xs pr-10" />
+                <Button variant="ghost" size="icon" className="absolute right-0 top-0 h-full" onClick={() => setShowWebhookSecret(!showWebhookSecret)}>
                   {showWebhookSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
               </div>
-              <Button variant="outline" size="icon" onClick={() => copyToClipboard(data?.webhook_secret ?? "", "Webhook Secret")}>
-                <Copy className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="icon" onClick={() => handleRegenerate("webhook_secret")}>
-                <RefreshCw className="h-4 w-4" />
-              </Button>
+              <Button variant="outline" size="icon" onClick={() => copyToClipboard(data?.webhook_secret ?? "", "Webhook Secret")}><Copy className="h-4 w-4" /></Button>
+              <Button variant="outline" size="icon" onClick={() => handleRegenerate("webhook_secret")}><RefreshCw className="h-4 w-4" /></Button>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Desktop Agent Setup */}
+      <Card className="border-0 shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Camera className="h-5 w-5" /> Desktop Agent
+          </CardTitle>
+          <CardDescription>Install the agent on employee PCs to capture screenshots and detect idle time</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="bg-muted rounded-lg p-4 text-sm space-y-2">
+            <p className="font-medium">Quick Setup:</p>
+            <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
+              <li>Download the <code className="text-xs bg-background px-1 py-0.5 rounded">desktop-agent/</code> folder from the project</li>
+              <li>Install Python 3.9+ and run: <code className="text-xs bg-background px-1 py-0.5 rounded">pip install -r requirements.txt</code></li>
+              <li>Copy <code className="text-xs bg-background px-1 py-0.5 rounded">config.example.json</code> to <code className="text-xs bg-background px-1 py-0.5 rounded">config.json</code></li>
+              <li>Fill in the API URL, API Key, and User ID</li>
+              <li>Run: <code className="text-xs bg-background px-1 py-0.5 rounded">python agent.py</code></li>
+            </ol>
           </div>
         </CardContent>
       </Card>

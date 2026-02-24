@@ -10,8 +10,10 @@ import {
   LogOut,
   Timer,
   Activity,
+  Monitor,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { NotificationBell } from "@/components/NotificationBell";
 
 const navItems = {
   employee: [
@@ -23,6 +25,7 @@ const navItems = {
     { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
     { to: "/timesheet", icon: Timer, label: "My Timesheet" },
     { to: "/team", icon: Users, label: "My Team" },
+    { to: "/monitoring", icon: Monitor, label: "Live Monitor" },
     { to: "/reports", icon: FileBarChart, label: "Reports" },
   ],
   admin: [
@@ -30,6 +33,7 @@ const navItems = {
     { to: "/timesheet", icon: Timer, label: "My Timesheet" },
     { to: "/employees", icon: Users, label: "Employees" },
     { to: "/departments", icon: Building2, label: "Departments" },
+    { to: "/monitoring", icon: Monitor, label: "Live Monitor" },
     { to: "/reports", icon: FileBarChart, label: "Reports" },
     { to: "/activity", icon: Activity, label: "Activity Logs" },
     { to: "/settings", icon: Settings, label: "Settings" },
@@ -44,16 +48,19 @@ export function AppSidebar() {
   return (
     <aside className="hidden md:flex fixed left-0 top-0 bottom-0 w-64 bg-sidebar-background text-sidebar-foreground flex-col z-30">
       {/* Logo */}
-      <div className="p-6 flex items-center gap-3">
-        <div className="h-9 w-9 rounded-xl bg-primary flex items-center justify-center shrink-0">
-          <Clock className="h-4 w-4 text-primary-foreground" />
+      <div className="p-6 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="h-9 w-9 rounded-xl bg-primary flex items-center justify-center shrink-0">
+            <Clock className="h-4 w-4 text-primary-foreground" />
+          </div>
+          <div>
+            <h1 className="text-lg font-bold tracking-tight" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+              TimeTrack
+            </h1>
+            <p className="text-[11px] text-sidebar-muted capitalize">{role ?? "employee"}</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-lg font-bold tracking-tight" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-            TimeTrack
-          </h1>
-          <p className="text-[11px] text-sidebar-muted capitalize">{role ?? "employee"}</p>
-        </div>
+        <NotificationBell />
       </div>
 
       {/* Nav */}
