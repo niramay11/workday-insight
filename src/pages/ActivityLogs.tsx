@@ -1,6 +1,6 @@
 import { AppLayout } from "@/components/layout/AppLayout";
-import { Card, CardContent } from "@/components/ui/card";
-import { Activity } from "lucide-react";
+import { ActivityFeed } from "@/components/ActivityFeed";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const ActivityLogs = () => (
   <AppLayout>
@@ -9,11 +9,12 @@ const ActivityLogs = () => (
         <h1 className="text-3xl font-bold tracking-tight" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Activity Logs</h1>
         <p className="text-muted-foreground mt-1">Monitor employee activity and system events</p>
       </div>
-      <Card className="border-dashed border-2">
-        <CardContent className="flex flex-col items-center justify-center py-12">
-          <Activity className="h-12 w-12 text-muted-foreground mb-4" />
-          <p className="text-muted-foreground text-lg font-medium">Coming Soon</p>
-          <p className="text-muted-foreground text-sm mt-1">Activity logging will be available in the next update</p>
+      <Card className="border-0 shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-lg">Activity Feed</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ActivityFeed />
         </CardContent>
       </Card>
     </div>
