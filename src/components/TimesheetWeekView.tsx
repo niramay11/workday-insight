@@ -32,13 +32,13 @@ export function TimesheetWeekView() {
   return (
     <Card className="border-0 shadow-sm">
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
           <CardTitle className="text-lg">Weekly Timesheet</CardTitle>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="icon" onClick={() => setWeekStart(subWeeks(weekStart, 1))}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <span className="text-sm font-medium min-w-[180px] text-center">
+            <span className="text-sm font-medium min-w-[140px] sm:min-w-[180px] text-center">
               {format(weekStart, "MMM d")} — {format(addWeeks(weekStart, 1), "MMM d, yyyy")}
             </span>
             <Button variant="outline" size="icon" onClick={() => setWeekStart(addWeeks(weekStart, 1))}>
@@ -52,8 +52,8 @@ export function TimesheetWeekView() {
           <p className="text-muted-foreground text-sm text-center py-8">Loading...</p>
         ) : (
           <div className="space-y-1">
-            {/* Header */}
-            <div className="grid grid-cols-[140px_1fr_1fr_80px_100px_60px] gap-2 px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            {/* Desktop Header */}
+            <div className="hidden md:grid grid-cols-[140px_1fr_1fr_80px_100px_60px] gap-2 px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
               <span>Date</span>
               <span>Punch In</span>
               <span>Punch Out</span>
@@ -67,8 +67,9 @@ export function TimesheetWeekView() {
               const lastRecord = day.records[day.records.length - 1];
               return (
                 <div key={day.date}>
+                  {/* Desktop row */}
                   <div
-                    className={`grid grid-cols-[140px_1fr_1fr_80px_100px_60px] gap-2 px-3 py-3 rounded-lg items-center cursor-pointer transition-colors ${
+                    className={`hidden md:grid grid-cols-[140px_1fr_1fr_80px_100px_60px] gap-2 px-3 py-3 rounded-lg items-center cursor-pointer transition-colors ${
                       isToday(date) ? "bg-primary/5" : "hover:bg-muted/50"
                     }`}
                     onClick={() => setExpandedDay(expandedDay === day.date ? null : day.date)}
@@ -97,6 +98,42 @@ export function TimesheetWeekView() {
                           <Moon className="h-3 w-3 mr-0.5" />{day.idleEvents.length}
                         </span>
                       )}
+                    </div>
+                  </div>
+                  {/* Mobile card */}
+                  <div
+                    className={`md:hidden px-3 py-3 rounded-lg cursor-pointer transition-colors ${
+                      isToday(date) ? "bg-primary/5" : "hover:bg-muted/50"
+                    }`}
+                    onClick={() => setExpandedDay(expandedDay === day.date ? null : day.date)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className={`text-sm font-medium ${isToday(date) ? "text-primary" : ""}`}>
+                        {format(date, "EEE, MMM d")}
+                      </span>
+                      <span className={`text-sm font-semibold ${getStatusColor(day)}`}>
+                        {day.totalHours > 0 ? `${day.totalHours.toFixed(1)}h` : "—"}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between mt-1">
+                      <span className="text-xs text-muted-foreground">
+                        {firstRecord ? format(new Date(firstRecord.punch_in), "hh:mm a") : "—"}
+                        {" - "}
+                        {lastRecord?.punch_out ? format(new Date(lastRecord.punch_out), "hh:mm a") : firstRecord?.status === "active" ? "In progress" : "—"}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        {getStatusBadge(day)}
+                        {day.screenshots.length > 0 && (
+                          <span className="flex items-center text-xs text-muted-foreground">
+                            <Camera className="h-3 w-3 mr-0.5" />{day.screenshots.length}
+                          </span>
+                        )}
+                        {day.idleEvents.length > 0 && (
+                          <span className="flex items-center text-xs text-muted-foreground">
+                            <Moon className="h-3 w-3 mr-0.5" />{day.idleEvents.length}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                   {expandedDay === day.date && (

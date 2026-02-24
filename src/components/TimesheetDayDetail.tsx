@@ -41,7 +41,7 @@ export function TimesheetDayDetail({ day }: Props) {
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
             <Camera className="h-3 w-3" /> Screenshots ({day.screenshots.length})
           </p>
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
             {day.screenshots.map((s) => (
               <div key={s.id} className="relative rounded-lg overflow-hidden bg-muted aspect-video">
                 <img src={s.image_url} alt="Screenshot" className="object-cover w-full h-full" />
