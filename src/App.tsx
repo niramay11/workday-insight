@@ -7,6 +7,8 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
+import Departments from "./pages/Departments";
+import Employees from "./pages/Employees";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,6 +28,22 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/departments"
+              element={
+                <ProtectedRoute>
+                  <Departments />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/employees"
+              element={
+                <ProtectedRoute>
+                  <Employees />
                 </ProtectedRoute>
               }
             />
