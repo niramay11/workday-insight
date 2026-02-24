@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
-import { Copy, RefreshCw, Save, Shield, Clock, Eye, EyeOff, Camera, Bell } from "lucide-react";
+import { Copy, RefreshCw, Save, Shield, Clock, Eye, EyeOff, Camera, Bell, Palette } from "lucide-react";
+import { useTheme } from "next-themes";
 
 export function SettingsForm() {
   const { role } = useAuth();
@@ -17,6 +18,7 @@ export function SettingsForm() {
   const [missedPunchTime, setMissedPunchTime] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
   const [showWebhookSecret, setShowWebhookSecret] = useState(false);
+  const { theme, setTheme } = useTheme();
 
   const data = settings.data;
   const isAdmin = role === "admin";
@@ -76,6 +78,30 @@ export function SettingsForm() {
 
   return (
     <div className="space-y-6">
+      {/* Appearance */}
+      <Card className="border-0 shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Palette className="h-5 w-5" /> Appearance
+          </CardTitle>
+          <CardDescription>Choose your preferred theme</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-3">
+            {(["light", "dark", "system"] as const).map((t) => (
+              <Button
+                key={t}
+                variant={theme === t ? "default" : "outline"}
+                onClick={() => setTheme(t)}
+                className="capitalize"
+              >
+                {t}
+              </Button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* General Settings */}
       <Card className="border-0 shadow-sm">
         <CardHeader>
