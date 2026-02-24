@@ -197,7 +197,7 @@ const Departments = () => {
                 <CardContent>
                   <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                     <Users className="h-3.5 w-3.5" />
-                    {employeeCounts?.[dept.id] ?? 0} employees
+                    {employeeCounts?.[dept.id] ?? 0} {(employeeCounts?.[dept.id] ?? 0) === 1 ? "employee" : "employees"}
                   </div>
                 </CardContent>
               </Card>
