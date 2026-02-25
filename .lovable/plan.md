@@ -1,77 +1,52 @@
 
+## Add Agent Heartbeat Data to Employee Profile Page
 
-## Feature 1: Downloadable Agent Configuration Package
+### Overview
+Add an "Agent Status" card to the Employee Profile page showing the current connection status and heartbeat details for that employee's Windows Agent.
 
-Since the C# source code needs to be compiled on a development machine, the most practical approach is to provide a **pre-configured download** that gives admins everything they need.
+### Changes
 
-### Implementation
+#### 1. Update `src/hooks/useEmployeeProfile.ts`
+- Add a new `useQuery` call to fetch the `agent_heartbeats` row for the given `user_id`
+- Return the heartbeat data alongside existing profile data
+- Use `refetchInterval: 30000` to keep the status live
 
-**New Edge Function: `download-agent-config`**
-- Generates a ZIP file containing:
-  - `appsettings.json` pre-filled with the project's API URL, the current API key, and a placeholder for user ID
-  - `install.ps1` - a PowerShell script with the `sc.exe` commands ready to run
-  - `README.txt` - quick-start instructions
-- Uses the `fflate` library (available via esm.sh) for ZIP generation
-- Authenticated + admin-only (checks user role)
-
-**Settings Page Update (`SettingsForm.tsx`)**
-- Add a "Download Agent Package" button in the Windows Agent card
-- Clicking it calls the edge function and triggers a browser download of `TimeTrackAgent-Config.zip`
-- The button shows a loading spinner while generating
-
----
-
-## Feature 2: Agent Connection Status Indicator
-
-### Database Changes
-
-**New table: `agent_heartbeats`**
-- `id` (uuid, PK)
-- `user_id` (uuid, unique, not null)
-- `last_seen_at` (timestamptz, not null, default now())
-- `agent_version` (text, nullable)
-- `hostname` (text, nullable)
-
-RLS policies:
-- Admins/managers can SELECT all rows
-- Users can SELECT their own row
-- No direct INSERT/UPDATE from client (only via edge function)
-
-**Migration**: Create the table with appropriate RLS.
-
-### Backend Changes
-
-**Update `agent-api` edge function**
-- On every incoming request (any action), upsert into `agent_heartbeats` with the current timestamp, agent version, and hostname (from payload)
-- This happens automatically so no agent code changes are needed
-
-### Frontend Changes
-
-**Update `useMonitoring.ts`**
-- Fetch `agent_heartbeats` alongside other data
-- Add `agentConnected` (boolean) and `agentLastSeen` (string) to the `EmployeeStatus` interface
-- An agent is "connected" if `last_seen_at` is within the last 10 minutes
-
-**Update `EmployeeStatusCard.tsx`**
-- Add a small indicator dot/badge showing agent connection status (green = connected, gray = never connected, red = disconnected)
-- Show tooltip with last seen timestamp
-
-**Update `Employees.tsx` table**
-- Add an "Agent" column showing a connection status badge per employee
+#### 2. Update `src/pages/EmployeeProfile.tsx`
+- Import `Cpu` icon from lucide-react and `formatDistanceToNow` from date-fns
+- Add an **Agent Status** card in the header area (next to the stats cards or in the profile header) showing:
+  - Connection status dot (green/red/gray) with label text ("Connected", "Disconnected", "Never Connected")
+  - Last seen timestamp (e.g., "3 minutes ago")
+  - Agent version (if available)
+  - Hostname (if available)
+- The card uses the same 10-minute threshold logic already established in `useMonitoring.ts` and `Employees.tsx`
 
 ### Technical Details
 
-- The heartbeat is lightweight -- a single upsert per API call, no extra network requests from the agent
-- Status logic: connected (< 10 min), disconnected (> 10 min), never (no row)
-- The `useMonitoring` hook already refetches every 30 seconds, so status updates appear quickly
+**Heartbeat query in `useEmployeeProfile.ts`:**
+```typescript
+const heartbeat = useQuery({
+  queryKey: ["employee_heartbeat", userId],
+  enabled: !!userId,
+  queryFn: async () => {
+    const { data } = await supabase
+      .from("agent_heartbeats")
+      .select("*")
+      .eq("user_id", userId!)
+      .single();
+    return data;
+  },
+  refetchInterval: 30000,
+});
+```
 
-### Implementation Order
+**Agent Status card in `EmployeeProfile.tsx`:**
+- Placed between the header and the stats grid
+- Shows a compact card with the Cpu icon, status dot, last seen time, version, and hostname
+- Follows the same styling patterns as existing stat cards (border-0, shadow-sm)
 
-1. Create `agent_heartbeats` table via migration
-2. Update `agent-api` edge function to upsert heartbeats
-3. Create `download-agent-config` edge function
-4. Update `useMonitoring.ts` to include heartbeat data
-5. Update `EmployeeStatusCard.tsx` with agent indicator
-6. Update `Employees.tsx` with agent column
-7. Update `SettingsForm.tsx` with download button
+### No Database or Backend Changes
+The `agent_heartbeats` table and RLS policies already exist. This is a frontend-only change.
 
+### Files Modified
+1. `src/hooks/useEmployeeProfile.ts` -- add heartbeat query
+2. `src/pages/EmployeeProfile.tsx` -- add Agent Status card
