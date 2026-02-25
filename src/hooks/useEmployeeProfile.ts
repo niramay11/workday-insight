@@ -67,6 +67,20 @@ export function useEmployeeProfile(userId: string | undefined) {
     },
   });
 
+  const heartbeat = useQuery({
+    queryKey: ["employee_heartbeat", userId],
+    enabled: !!userId,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("agent_heartbeats")
+        .select("*")
+        .eq("user_id", userId!)
+        .maybeSingle();
+      return data;
+    },
+    refetchInterval: 30000,
+  });
+
   // Stats
   const stats = (() => {
     const records = attendance.data ?? [];
@@ -99,6 +113,7 @@ export function useEmployeeProfile(userId: string | undefined) {
     attendance,
     screenshots,
     idleEvents,
+    heartbeat,
     stats,
     isLoading: profile.isLoading,
   };

@@ -5,9 +5,9 @@ import { useEmployeeProfile } from "@/hooks/useEmployeeProfile";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Clock, Calendar, Timer, AlertTriangle, ArrowLeft } from "lucide-react";
+import { Clock, Calendar, Timer, AlertTriangle, ArrowLeft, Cpu } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import { useState } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Link } from "react-router-dom";
@@ -15,7 +15,7 @@ import { Link } from "react-router-dom";
 const EmployeeProfile = () => {
   const { id } = useParams<{ id: string }>();
   const { role, user } = useAuth();
-  const { profile, attendance, screenshots, idleEvents, stats, isLoading } = useEmployeeProfile(id);
+  const { profile, attendance, screenshots, idleEvents, heartbeat, stats, isLoading } = useEmployeeProfile(id);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   // Access: admin or own profile
@@ -68,6 +68,38 @@ const EmployeeProfile = () => {
             </div>
           </div>
         </div>
+
+        {/* Agent Status */}
+        {(() => {
+          const hb = heartbeat.data;
+          const isConnected = hb ? (Date.now() - new Date(hb.last_seen_at).getTime()) < 10 * 60 * 1000 : false;
+          const statusColor = !hb ? "bg-muted-foreground" : isConnected ? "bg-[hsl(var(--success,142_76%_36%))]" : "bg-destructive";
+          const statusLabel = !hb ? "Never Connected" : isConnected ? "Connected" : "Disconnected";
+          return (
+            <Card className="border-0 shadow-sm">
+              <CardContent className="pt-5 pb-4">
+                <div className="flex items-center gap-3">
+                  <Cpu className="h-5 w-5 text-muted-foreground" />
+                  <div className="flex items-center gap-2">
+                    <span className={`h-2.5 w-2.5 rounded-full ${statusColor}`} />
+                    <span className="text-sm font-medium">{statusLabel}</span>
+                  </div>
+                  {hb && (
+                    <span className="text-xs text-muted-foreground ml-auto">
+                      Last seen {formatDistanceToNow(new Date(hb.last_seen_at), { addSuffix: true })}
+                    </span>
+                  )}
+                </div>
+                {hb && (hb.agent_version || hb.hostname) && (
+                  <div className="flex gap-4 mt-2 ml-8 text-xs text-muted-foreground">
+                    {hb.hostname && <span>Host: {hb.hostname}</span>}
+                    {hb.agent_version && <span>v{hb.agent_version}</span>}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })()}
 
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
