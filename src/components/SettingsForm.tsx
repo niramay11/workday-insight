@@ -205,24 +205,30 @@ export function SettingsForm() {
         </CardContent>
       </Card>
 
-      {/* Desktop Agent Setup */}
+      {/* Windows Agent Setup */}
       <Card className="border-0 shadow-sm">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
-            <Camera className="h-5 w-5" /> Desktop Agent
+            <Camera className="h-5 w-5" /> Windows Agent (C# Service)
           </CardTitle>
-          <CardDescription>Install the agent on employee PCs to capture screenshots and detect idle time</CardDescription>
+          <CardDescription>Install the tamper-resistant Windows Service on employee PCs to capture screenshots, detect idle time, and auto-lock screens</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="bg-muted rounded-lg p-4 text-sm space-y-2">
             <p className="font-medium">Quick Setup:</p>
             <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
-              <li>Download the <code className="text-xs bg-background px-1 py-0.5 rounded">desktop-agent/</code> folder from the project</li>
-              <li>Install Python 3.9+ and run: <code className="text-xs bg-background px-1 py-0.5 rounded">pip install -r requirements.txt</code></li>
-              <li>Copy <code className="text-xs bg-background px-1 py-0.5 rounded">config.example.json</code> to <code className="text-xs bg-background px-1 py-0.5 rounded">config.json</code></li>
-              <li>Fill in the API URL, API Key, and User ID</li>
-              <li>Run: <code className="text-xs bg-background px-1 py-0.5 rounded">python agent.py</code></li>
+              <li>Download the <code className="text-xs bg-background px-1 py-0.5 rounded">windows-agent/</code> folder from the project</li>
+              <li>Install <a href="https://dotnet.microsoft.com/download/dotnet/8.0" target="_blank" rel="noopener noreferrer" className="underline text-primary">.NET 8 SDK</a></li>
+              <li>Edit <code className="text-xs bg-background px-1 py-0.5 rounded">TimeTrackAgent/appsettings.json</code> with your API URL, API Key, and User ID</li>
+              <li>Build: <code className="text-xs bg-background px-1 py-0.5 rounded">dotnet publish TimeTrackAgent -c Release -o ./publish/agent</code></li>
+              <li>Install service (Admin PowerShell): <code className="text-xs bg-background px-1 py-0.5 rounded">sc.exe create TimeTrackAgent binPath="..." start=auto obj=LocalSystem</code></li>
+              <li>Install watchdog: <code className="text-xs bg-background px-1 py-0.5 rounded">sc.exe create TimeTrackWatchdog binPath="..." start=auto obj=LocalSystem</code></li>
+              <li>Start both: <code className="text-xs bg-background px-1 py-0.5 rounded">sc.exe start TimeTrackAgent</code> and <code className="text-xs bg-background px-1 py-0.5 rounded">sc.exe start TimeTrackWatchdog</code></li>
             </ol>
+          </div>
+          <div className="bg-muted/50 rounded-lg p-4 text-sm space-y-1">
+            <p className="font-medium">Enterprise Deployment:</p>
+            <p className="text-muted-foreground">For deploying across many machines, package as an MSI and push via Active Directory GPO, Microsoft Intune, or RMM tools. See the <code className="text-xs bg-background px-1 py-0.5 rounded">windows-agent/README.md</code> for full instructions.</p>
           </div>
         </CardContent>
       </Card>
