@@ -1,135 +1,77 @@
 
 
-## Replace Python Desktop Agent with C# (.NET) Windows Service
+## Feature 1: Downloadable Agent Configuration Package
 
-This plan replaces the existing Python-based desktop agent with a C# (.NET) Windows Service. The backend API remains unchanged -- the new agent communicates with the same `agent-api` endpoint. The web dashboard's Settings page will be updated to reflect the new installation process.
+Since the C# source code needs to be compiled on a development machine, the most practical approach is to provide a **pre-configured download** that gives admins everything they need.
 
----
+### Implementation
 
-### What Changes
+**New Edge Function: `download-agent-config`**
+- Generates a ZIP file containing:
+  - `appsettings.json` pre-filled with the project's API URL, the current API key, and a placeholder for user ID
+  - `install.ps1` - a PowerShell script with the `sc.exe` commands ready to run
+  - `README.txt` - quick-start instructions
+- Uses the `fflate` library (available via esm.sh) for ZIP generation
+- Authenticated + admin-only (checks user role)
 
-#### 1. Remove the Python Agent
-Delete the entire `desktop-agent/` folder (agent.py, config.py, screenshot.py, idle_detector.py, tray_icon.py, api_client.py, requirements.txt, config.example.json, README.md).
-
-#### 2. Create `windows-agent/` -- C# .NET Windows Service
-
-A new folder at the project root containing a complete C# solution:
-
-```text
-windows-agent/
-  TimeTrackAgent.sln                -- Solution file
-  TimeTrackAgent/
-    Program.cs                      -- Entry point, host builder for Windows Service
-    Worker.cs                       -- Main background service (orchestrates all modules)
-    appsettings.json                -- Configuration (API URL, API key, user ID, intervals)
-    TimeTrackAgent.csproj           -- Project file (.NET 8, Windows target)
-    Services/
-      ApiClient.cs                  -- HttpClient wrapper for agent-api endpoint
-      IdleDetector.cs               -- Uses GetLastInputInfo Win32 API for idle tracking
-      ScreenshotCapture.cs          -- Uses Graphics.CopyFromScreen for desktop capture
-      SessionWatcher.cs             -- Hooks SystemEvents.SessionSwitch for lock/unlock
-      LockScreenManager.cs          -- Forces LockWorkStation after idle threshold
-    Models/
-      AgentConfig.cs                -- Strongly-typed config model
-      ApiPayload.cs                 -- Request/response DTOs
-  TimeTrackAgent.Watchdog/
-    Program.cs                      -- Watchdog service that monitors + restarts main service
-    WatchdogWorker.cs               -- Checks if main service is running, restarts if crashed
-    TimeTrackAgent.Watchdog.csproj  -- Project file
-  README.md                         -- Full setup, build, install, and deployment guide
-```
-
-#### Core Features
-
-**Idle Tracking (GetLastInputInfo)**
-- Calls `GetLastInputInfo` via P/Invoke every 5 seconds
-- When idle exceeds configured threshold (default 10 minutes), sends `idle_start` to API and calls `LockWorkStation` to force-lock the screen
-
-**Session Lock/Unlock Detection**
-- Subscribes to `SystemEvents.SessionSwitch`
-- On `SessionUnlock`: sends `idle_end` to API and logs the unlock event
-- On `SessionLock`: sends `idle_start` to API
-
-**Screenshot Capture**
-- Uses `System.Drawing.Graphics.CopyFromScreen` to capture the full desktop
-- Compresses to PNG, base64-encodes, sends via `screenshot` action to the existing `agent-api` endpoint
-- Configurable interval (default: 5 minutes), skips capture while idle
-
-**API Communication**
-- Uses `HttpClient` to POST to the same `agent-api` edge function
-- Same payload format: `{ action, user_id, data }` with `Bearer` API key auth
-- Handles retries and logs errors
-
-**Watchdog Service**
-- A separate Windows Service that polls the main service status every 30 seconds
-- If the main service is stopped/crashed, it restarts it automatically
-- Both services are installed under LocalSystem account so standard users cannot stop them
-
-#### 3. Update `agent-api` Edge Function
-
-**No changes needed.** The existing API accepts `{ action, user_id, data }` with bearer token auth. The C# agent sends the exact same payloads. Two small additions:
-
-- Add `session_lock` and `session_unlock` as recognized action types (they already pass through as activity log entries, so this is optional and backward-compatible)
-
-#### 4. Update Settings Page (`src/components/SettingsForm.tsx`)
-
-Replace the "Desktop Agent" setup card at the bottom with updated instructions for the C# agent:
-
-- Replace Python instructions with:
-  1. Download the `windows-agent/` folder
-  2. Build with `dotnet publish -c Release`
-  3. Install as Windows Service: `sc create TimeTrackAgent binPath="..." start=auto`
-  4. Install watchdog: `sc create TimeTrackWatchdog binPath="..." start=auto`
-  5. Configure `appsettings.json` with API URL, API Key, and User ID
-  6. Start both services
-
-- Add a note about MSI packaging and GPO/Intune deployment for enterprise rollout
-
-#### 5. No Database Changes
-
-The agent uses the same tables (`attendance_records`, `screenshots`, `idle_events`, `activity_logs`) and the same API endpoint. No schema changes required.
+**Settings Page Update (`SettingsForm.tsx`)**
+- Add a "Download Agent Package" button in the Windows Agent card
+- Clicking it calls the edge function and triggers a browser download of `TimeTrackAgent-Config.zip`
+- The button shows a loading spinner while generating
 
 ---
+
+## Feature 2: Agent Connection Status Indicator
+
+### Database Changes
+
+**New table: `agent_heartbeats`**
+- `id` (uuid, PK)
+- `user_id` (uuid, unique, not null)
+- `last_seen_at` (timestamptz, not null, default now())
+- `agent_version` (text, nullable)
+- `hostname` (text, nullable)
+
+RLS policies:
+- Admins/managers can SELECT all rows
+- Users can SELECT their own row
+- No direct INSERT/UPDATE from client (only via edge function)
+
+**Migration**: Create the table with appropriate RLS.
+
+### Backend Changes
+
+**Update `agent-api` edge function**
+- On every incoming request (any action), upsert into `agent_heartbeats` with the current timestamp, agent version, and hostname (from payload)
+- This happens automatically so no agent code changes are needed
+
+### Frontend Changes
+
+**Update `useMonitoring.ts`**
+- Fetch `agent_heartbeats` alongside other data
+- Add `agentConnected` (boolean) and `agentLastSeen` (string) to the `EmployeeStatus` interface
+- An agent is "connected" if `last_seen_at` is within the last 10 minutes
+
+**Update `EmployeeStatusCard.tsx`**
+- Add a small indicator dot/badge showing agent connection status (green = connected, gray = never connected, red = disconnected)
+- Show tooltip with last seen timestamp
+
+**Update `Employees.tsx` table**
+- Add an "Agent" column showing a connection status badge per employee
 
 ### Technical Details
 
-**Target Framework:** .NET 8 with `Microsoft.Extensions.Hosting.WindowsServices`
-
-**Key Win32 APIs (P/Invoke):**
-- `GetLastInputInfo` -- idle time tracking
-- `LockWorkStation` -- force screen lock
-- `SystemEvents.SessionSwitch` -- lock/unlock events
-
-**Configuration (`appsettings.json`):**
-```json
-{
-  "AgentConfig": {
-    "ApiUrl": "https://YOUR_PROJECT.supabase.co/functions/v1/agent-api",
-    "ApiKey": "YOUR_AGENT_API_KEY",
-    "UserId": "YOUR_USER_UUID",
-    "ScreenshotIntervalSeconds": 300,
-    "IdleThresholdSeconds": 600
-  }
-}
-```
-
-**Tamper Resistance:**
-- Runs as LocalSystem -- standard users cannot stop/modify
-- Watchdog service auto-restarts crashed main service
-- Requires admin/GPO to uninstall
-- README includes guidance on revoking local admin rights
-
-**Enterprise Deployment Options (documented in README):**
-- MSI package via WiX or Visual Studio Installer
-- Active Directory GPO silent push
-- Microsoft Intune / Endpoint Manager
-- RMM tools (AnyDesk, ConnectWise)
-
----
+- The heartbeat is lightweight -- a single upsert per API call, no extra network requests from the agent
+- Status logic: connected (< 10 min), disconnected (> 10 min), never (no row)
+- The `useMonitoring` hook already refetches every 30 seconds, so status updates appear quickly
 
 ### Implementation Order
 
-1. Delete `desktop-agent/` folder
-2. Create `windows-agent/` solution with all C# files
-3. Create README with build, install, and deployment instructions
-4. Update `SettingsForm.tsx` with new agent setup instructions
+1. Create `agent_heartbeats` table via migration
+2. Update `agent-api` edge function to upsert heartbeats
+3. Create `download-agent-config` edge function
+4. Update `useMonitoring.ts` to include heartbeat data
+5. Update `EmployeeStatusCard.tsx` with agent indicator
+6. Update `Employees.tsx` with agent column
+7. Update `SettingsForm.tsx` with download button
+
