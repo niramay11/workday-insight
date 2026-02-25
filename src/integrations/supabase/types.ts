@@ -38,6 +38,30 @@ export type Database = {
         }
         Relationships: []
       }
+      agent_heartbeats: {
+        Row: {
+          agent_version: string | null
+          hostname: string | null
+          id: string
+          last_seen_at: string
+          user_id: string
+        }
+        Insert: {
+          agent_version?: string | null
+          hostname?: string | null
+          id?: string
+          last_seen_at?: string
+          user_id: string
+        }
+        Update: {
+          agent_version?: string | null
+          hostname?: string | null
+          id?: string
+          last_seen_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       app_settings: {
         Row: {
           id: string

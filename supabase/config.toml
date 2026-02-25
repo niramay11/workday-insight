@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.check-alerts]
 verify_jwt = false
+
+[functions.download-agent-config]
+verify_jwt = false

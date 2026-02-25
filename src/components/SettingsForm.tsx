@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
-import { Copy, RefreshCw, Save, Shield, Clock, Eye, EyeOff, Camera, Bell, Palette } from "lucide-react";
+import { Copy, RefreshCw, Save, Shield, Clock, Eye, EyeOff, Camera, Bell, Palette, Download, Loader2 } from "lucide-react";
 import { useTheme } from "next-themes";
 
 export function SettingsForm() {
@@ -18,6 +18,7 @@ export function SettingsForm() {
   const [missedPunchTime, setMissedPunchTime] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
   const [showWebhookSecret, setShowWebhookSecret] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const { theme, setTheme } = useTheme();
 
   const data = settings.data;
@@ -59,6 +60,36 @@ export function SettingsForm() {
   const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
   const agentUrl = `https://${projectId}.supabase.co/functions/v1/agent-api`;
   const webhookUrl = `https://${projectId}.supabase.co/functions/v1/webhook-receiver`;
+
+  const handleDownloadConfig = async () => {
+    setDownloading(true);
+    try {
+      const { data: sessionData } = await (await import("@/integrations/supabase/client")).supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (!token) throw new Error("Not authenticated");
+
+      const res = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/download-agent-config`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Download failed" }));
+        throw new Error(err.error);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "TimeTrackAgent-Config.zip";
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({ title: "Agent config package downloaded" });
+    } catch (err: any) {
+      toast({ title: "Download failed", description: err.message, variant: "destructive" });
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   if (!isAdmin) {
     return (
@@ -214,10 +245,14 @@ export function SettingsForm() {
           <CardDescription>Install the tamper-resistant Windows Service on employee PCs to capture screenshots, detect idle time, and auto-lock screens</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
+          <Button onClick={handleDownloadConfig} disabled={downloading} className="w-full sm:w-auto">
+            {downloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+            Download Agent Config Package
+          </Button>
           <div className="bg-muted rounded-lg p-4 text-sm space-y-2">
             <p className="font-medium">Quick Setup:</p>
             <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
-              <li>Download the <code className="text-xs bg-background px-1 py-0.5 rounded">windows-agent/</code> folder from the project</li>
+              <li>Download the config package above (contains pre-filled <code className="text-xs bg-background px-1 py-0.5 rounded">appsettings.json</code> and install script)</li>
               <li>Install <a href="https://dotnet.microsoft.com/download/dotnet/8.0" target="_blank" rel="noopener noreferrer" className="underline text-primary">.NET 8 SDK</a></li>
               <li>Edit <code className="text-xs bg-background px-1 py-0.5 rounded">TimeTrackAgent/appsettings.json</code> with your API URL, API Key, and User ID</li>
               <li>Build: <code className="text-xs bg-background px-1 py-0.5 rounded">dotnet publish TimeTrackAgent -c Release -o ./publish/agent</code></li>

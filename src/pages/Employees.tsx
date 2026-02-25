@@ -13,7 +13,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "@/hooks/use-toast";
-import { Search, UserPlus, Pencil, Users } from "lucide-react";
+import { Search, UserPlus, Pencil, Users, Cpu } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { formatDistanceToNow } from "date-fns";
 import { Navigate } from "react-router-dom";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -57,6 +59,16 @@ const Employees = () => {
       if (error) throw error;
       return data;
     },
+  });
+
+  const { data: heartbeats } = useQuery({
+    queryKey: ["agent_heartbeats"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("agent_heartbeats").select("*");
+      if (error) throw error;
+      return data;
+    },
+    refetchInterval: 30000,
   });
 
   const updateMutation = useMutation({
@@ -186,13 +198,14 @@ const Employees = () => {
           <Card className="border-0 shadow-sm">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Employee</TableHead>
-                  <TableHead>Department</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="w-12"></TableHead>
-                </TableRow>
+                 <TableRow>
+                   <TableHead>Employee</TableHead>
+                   <TableHead>Department</TableHead>
+                   <TableHead>Role</TableHead>
+                   <TableHead>Status</TableHead>
+                   <TableHead>Agent</TableHead>
+                   <TableHead className="w-12"></TableHead>
+                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filtered?.map((emp) => (
@@ -213,6 +226,28 @@ const Employees = () => {
                     <TableCell className="text-sm">{getDeptName(emp.department_id)}</TableCell>
                     <TableCell>{getRoleBadge(getUserRole(emp.user_id))}</TableCell>
                     <TableCell>{getStatusBadge(emp.status)}</TableCell>
+                    <TableCell>
+                      {(() => {
+                        const hb = heartbeats?.find((h) => h.user_id === emp.user_id);
+                        const lastSeen = hb?.last_seen_at ?? null;
+                        const connected = lastSeen ? (Date.now() - new Date(lastSeen).getTime()) < 10 * 60 * 1000 : false;
+                        const dotColor = lastSeen == null ? "bg-muted-foreground" : connected ? "bg-[hsl(var(--success))]" : "bg-destructive";
+                        const label = lastSeen == null ? "Never connected" : connected ? `Connected — ${formatDistanceToNow(new Date(lastSeen), { addSuffix: true })}` : `Disconnected — ${formatDistanceToNow(new Date(lastSeen), { addSuffix: true })}`;
+                        return (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="flex items-center gap-1.5 cursor-default">
+                                  <Cpu className="h-3.5 w-3.5 text-muted-foreground" />
+                                  <span className={`h-2.5 w-2.5 rounded-full ${dotColor}`} />
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>{label}</TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        );
+                      })()}
+                    </TableCell>
                     <TableCell>
                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(emp)}>
                         <Pencil className="h-3.5 w-3.5" />
