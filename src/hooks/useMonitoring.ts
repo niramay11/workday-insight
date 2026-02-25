@@ -12,6 +12,8 @@ interface EmployeeStatus {
   lastActivity: string | null;
   todayHours: number;
   latestScreenshot: string | null;
+  agentConnected: boolean;
+  agentLastSeen: string | null;
 }
 
 export function useMonitoring() {
@@ -23,17 +25,19 @@ export function useMonitoring() {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      const [profilesRes, attendanceRes, idleRes, screenshotsRes, activityRes] = await Promise.all([
+      const [profilesRes, attendanceRes, idleRes, screenshotsRes, activityRes, heartbeatsRes] = await Promise.all([
         supabase.from("profiles").select("*").eq("status", "active"),
         supabase.from("attendance_records").select("*").gte("punch_in", today.toISOString()),
         supabase.from("idle_events").select("*").gte("idle_start", today.toISOString()).is("idle_end", null),
         supabase.from("screenshots").select("*").gte("captured_at", today.toISOString()).order("captured_at", { ascending: false }),
         supabase.from("activity_logs").select("*").gte("created_at", today.toISOString()).order("created_at", { ascending: false }).limit(50),
+        supabase.from("agent_heartbeats").select("*"),
       ]);
 
       const profiles = profilesRes.data ?? [];
       const attendance = attendanceRes.data ?? [];
       const openIdles = idleRes.data ?? [];
+      const heartbeats = heartbeatsRes.data ?? [];
 
       const statuses: EmployeeStatus[] = profiles.map((p) => {
         const userAttendance = attendance.filter((a) => a.user_id === p.user_id);
@@ -42,6 +46,11 @@ export function useMonitoring() {
         const todayHours = userAttendance.reduce((s, r) => s + Number(r.total_hours ?? 0), 0);
         const latestSS = (screenshotsRes.data ?? []).find((s) => s.user_id === p.user_id);
         const latestAct = (activityRes.data ?? []).find((a) => a.user_id === p.user_id);
+        const heartbeat = heartbeats.find((h) => h.user_id === p.user_id);
+        const agentLastSeen = heartbeat?.last_seen_at ?? null;
+        const agentConnected = agentLastSeen
+          ? (Date.now() - new Date(agentLastSeen).getTime()) < 10 * 60 * 1000
+          : false;
 
         return {
           userId: p.user_id,
@@ -53,6 +62,8 @@ export function useMonitoring() {
           lastActivity: latestAct?.created_at ?? null,
           todayHours: Math.round(todayHours * 10) / 10,
           latestScreenshot: latestSS?.image_url ?? null,
+          agentConnected,
+          agentLastSeen,
         };
       });
 

@@ -65,6 +65,17 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Upsert heartbeat on every request
+    await supabase.from("agent_heartbeats").upsert(
+      {
+        user_id,
+        last_seen_at: new Date().toISOString(),
+        agent_version: payload?.agent_version ?? null,
+        hostname: payload?.hostname ?? null,
+      },
+      { onConflict: "user_id" }
+    );
+
     let result: any = null;
 
     if (action === "screenshot" && activeRecord) {

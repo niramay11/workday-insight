@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Clock, Monitor } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Clock, Monitor, Cpu } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useState } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -13,6 +14,8 @@ interface Props {
   lastActivity: string | null;
   todayHours: number;
   latestScreenshot: string | null;
+  agentConnected: boolean;
+  agentLastSeen: string | null;
   onClick?: () => void;
 }
 
@@ -28,7 +31,13 @@ const dotColors = {
   offline: "bg-muted-foreground",
 };
 
-export function EmployeeStatusCard({ fullName, email, status, lastActivity, todayHours, latestScreenshot }: Props) {
+const agentStatusColors = {
+  connected: "bg-[hsl(var(--success))]",
+  disconnected: "bg-destructive",
+  never: "bg-muted-foreground",
+};
+
+export function EmployeeStatusCard({ fullName, email, status, lastActivity, todayHours, latestScreenshot, agentConnected, agentLastSeen }: Props) {
   const [showScreenshot, setShowScreenshot] = useState(false);
 
   return (
@@ -55,6 +64,25 @@ export function EmployeeStatusCard({ fullName, email, status, lastActivity, toda
             <span className="flex items-center gap-1">
               <Clock className="h-3 w-3" /> {todayHours}h today
             </span>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="flex items-center gap-1 cursor-default">
+                    <Cpu className="h-3 w-3" />
+                    <span className={`h-2 w-2 rounded-full ${agentLastSeen == null ? agentStatusColors.never : agentConnected ? agentStatusColors.connected : agentStatusColors.disconnected}`} />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {agentLastSeen == null
+                    ? "Agent never connected"
+                    : agentConnected
+                      ? `Agent connected — last seen ${formatDistanceToNow(new Date(agentLastSeen), { addSuffix: true })}`
+                      : `Agent disconnected — last seen ${formatDistanceToNow(new Date(agentLastSeen), { addSuffix: true })}`}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+          <div className="flex items-center justify-end text-xs text-muted-foreground">
             {lastActivity && (
               <span>{formatDistanceToNow(new Date(lastActivity), { addSuffix: true })}</span>
             )}
