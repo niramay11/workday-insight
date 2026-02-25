@@ -1,7 +1,0 @@
-{
-  "api_url": "https://YOUR_PROJECT_ID.supabase.co/functions/v1/agent-api",
-  "api_key": "YOUR_AGENT_API_KEY_FROM_SETTINGS",
-  "user_id": "YOUR_USER_UUID",
-  "screenshot_interval_seconds": 300,
-  "idle_threshold_seconds": 600
-}
