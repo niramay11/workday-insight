@@ -1,0 +1,81 @@
+<Window x:Class="TimeTrackAgent.UI.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="TimeTrack"
+        WindowStartupLocation="CenterScreen"
+        WindowStyle="None"
+        ResizeMode="NoResize"
+        Topmost="True"
+        Width="480" Height="520"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ShowInTaskbar="False">
+
+    <Border Background="White" CornerRadius="16" Margin="16"
+            Effect="{StaticResource {x:Null}}">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="20" ShadowDepth="4" Opacity="0.3"/>
+        </Border.Effect>
+
+        <Grid Margin="32">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Header -->
+            <TextBlock x:Name="HeaderText" Grid.Row="0"
+                       Text="Welcome Back!"
+                       FontSize="22" FontWeight="Bold"
+                       Foreground="#0F172A" Margin="0,0,0,4"/>
+
+            <TextBlock x:Name="SubHeaderText" Grid.Row="1"
+                       Text="What were you doing?"
+                       FontSize="14" Foreground="#64748B"
+                       Margin="0,0,0,20"/>
+
+            <!-- Break type list -->
+            <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                <StackPanel x:Name="BreakTypePanel">
+                    <!-- Populated dynamically -->
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- Custom reason input (hidden by default) -->
+            <TextBox x:Name="CustomReasonBox" Grid.Row="3"
+                     Visibility="Collapsed"
+                     FontSize="14" Padding="12,10"
+                     Margin="0,12,0,0"
+                     AcceptsReturn="False"
+                     MaxLength="200">
+                <TextBox.Resources>
+                    <Style TargetType="Border">
+                        <Setter Property="CornerRadius" Value="8"/>
+                    </Style>
+                </TextBox.Resources>
+            </TextBox>
+
+            <!-- Task input (for day-start mode) -->
+            <StackPanel x:Name="TaskPanel" Grid.Row="3" Visibility="Collapsed" Margin="0,8,0,0">
+                <TextBlock Text="What will you be working on?" FontSize="13" Foreground="#64748B" Margin="0,0,0,6"/>
+                <TextBox x:Name="TaskBox" FontSize="14" Padding="12,10" MaxLength="200">
+                    <TextBox.Resources>
+                        <Style TargetType="Border">
+                            <Setter Property="CornerRadius" Value="8"/>
+                        </Style>
+                    </TextBox.Resources>
+                </TextBox>
+            </StackPanel>
+
+            <!-- Submit button -->
+            <Button x:Name="SubmitButton" Grid.Row="4"
+                    Content="Punch In"
+                    Style="{StaticResource PrimaryButton}"
+                    Margin="0,20,0,0"
+                    Click="OnSubmitClicked"/>
+        </Grid>
+    </Border>
+</Window>

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -17,7 +18,13 @@ public class Worker : BackgroundService
     private readonly AgentConfig _config;
 
     private bool _isIdle;
+    private bool _isPunchedOut;
     private DateTime _lastScreenshot = DateTime.MinValue;
+
+    private static readonly string StateDir = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+        "TimeTrackAgent");
+    private static readonly string StateFilePath = Path.Combine(StateDir, "state.json");
 
     public Worker(
         ILogger<Worker> logger,
@@ -35,6 +42,8 @@ public class Worker : BackgroundService
         _sessionWatcher = sessionWatcher;
         _lockScreenManager = lockScreenManager;
         _config = config.Value;
+
+        Directory.CreateDirectory(StateDir);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -44,50 +53,82 @@ public class Worker : BackgroundService
         // Subscribe to session events
         _sessionWatcher.SessionLocked += async (_, _) =>
         {
-            _isIdle = true;
-            await _apiClient.SendAsync("idle_start", new { source = "session_lock" });
-            _logger.LogInformation("Session locked — idle_start sent");
+            if (!_isPunchedOut)
+            {
+                _isIdle = true;
+                _isPunchedOut = true;
+                await _apiClient.SendAsync("idle_start", new { source = "session_lock" });
+                await _apiClient.SendAsync("punch_out", new { source = "session_lock" });
+                WriteStateFile("punch_out", "session_lock", 0);
+                _logger.LogInformation("Session locked — punch_out sent");
+            }
         };
 
         _sessionWatcher.SessionUnlocked += async (_, _) =>
         {
             _isIdle = false;
             await _apiClient.SendAsync("idle_end", new { source = "session_unlock" });
-            _logger.LogInformation("Session unlocked — idle_end sent");
+            // Don't clear _isPunchedOut here — UI app will handle punch_in
+            // Just signal that unlock happened
+            WriteStateFile("session_unlocked", "session_unlock", 0);
+            _logger.LogInformation("Session unlocked — idle_end sent, awaiting UI punch_in");
         };
 
         _sessionWatcher.Start();
 
-        // Main loop — checks idle and captures screenshots
+        // Main loop
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
                 var idleSeconds = _idleDetector.GetIdleSeconds();
 
-                // Idle threshold exceeded — lock screen
-                if (!_isIdle && idleSeconds >= _config.IdleThresholdSeconds)
+                // Idle threshold exceeded — punch out and lock screen
+                if (!_isPunchedOut && idleSeconds >= _config.IdleThresholdSeconds)
                 {
                     _isIdle = true;
+                    _isPunchedOut = true;
                     await _apiClient.SendAsync("idle_start", new { idle_seconds = idleSeconds, source = "input_timeout" });
+                    await _apiClient.SendAsync("punch_out", new { source = "input_timeout", idle_seconds = idleSeconds });
+                    WriteStateFile("punch_out", "idle_timeout", idleSeconds);
                     _lockScreenManager.Lock();
-                    _logger.LogInformation("Idle threshold reached ({Seconds}s) — screen locked", idleSeconds);
+                    _logger.LogInformation("Idle threshold reached ({Seconds}s) — punched out and screen locked", idleSeconds);
                 }
-                else if (_isIdle && idleSeconds < 10)
+                else if (_isIdle && !_isPunchedOut && idleSeconds < 10)
                 {
-                    // User came back (detected by input before session unlock fires)
+                    // Short idle that didn't reach threshold — just mark as resumed
                     _isIdle = false;
                     await _apiClient.SendAsync("idle_end", new { source = "input_resumed" });
                     _logger.LogInformation("Input resumed — idle_end sent");
                 }
 
-                // Screenshot capture (skip while idle)
-                if (!_isIdle && (DateTime.UtcNow - _lastScreenshot).TotalSeconds >= _config.ScreenshotIntervalSeconds)
+                // Check if UI app acknowledged punch_in (read state file)
+                if (_isPunchedOut)
+                {
+                    try
+                    {
+                        if (File.Exists(StateFilePath))
+                        {
+                            var stateJson = await File.ReadAllTextAsync(StateFilePath, stoppingToken);
+                            var state = JsonSerializer.Deserialize<AgentState>(stateJson);
+                            if (state?.Acknowledged == true)
+                            {
+                                _isPunchedOut = false;
+                                _isIdle = false;
+                                _logger.LogInformation("UI app acknowledged punch_in — resuming monitoring");
+                            }
+                        }
+                    }
+                    catch { /* state file may be locked by UI app */ }
+                }
+
+                // Screenshot capture (skip while punched out)
+                if (!_isPunchedOut && (DateTime.UtcNow - _lastScreenshot).TotalSeconds >= _config.ScreenshotIntervalSeconds)
                 {
                     var base64 = _screenshotCapture.CaptureAsBase64();
                     if (base64 != null)
                     {
-                        await _apiClient.SendAsync("screenshot", new { image = base64 });
+                        await _apiClient.SendAsync("screenshot", new { image_base64 = base64 });
                         _lastScreenshot = DateTime.UtcNow;
                         _logger.LogInformation("Screenshot captured and sent");
                     }
@@ -103,5 +144,33 @@ public class Worker : BackgroundService
 
         _sessionWatcher.Stop();
         _logger.LogInformation("TimeTrackAgent stopped");
+    }
+
+    private void WriteStateFile(string lastEvent, string reason, int idleDurationSeconds)
+    {
+        try
+        {
+            var state = new AgentState
+            {
+                LastEvent = lastEvent,
+                Timestamp = DateTime.UtcNow.ToString("o"),
+                IdleDurationSeconds = idleDurationSeconds,
+                Reason = reason,
+                Acknowledged = false
+            };
+
+            var json = JsonSerializer.Serialize(state, new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+                WriteIndented = true
+            });
+
+            File.WriteAllText(StateFilePath, json);
+            _logger.LogDebug("State file written: {Event}", lastEvent);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to write state file");
+        }
     }
 }

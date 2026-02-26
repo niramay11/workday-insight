@@ -82,6 +82,19 @@ Deno.serve(async (req) => {
 
 $AgentPath = Read-Host "Enter full path to TimeTrackAgent.exe"
 $WatchdogPath = Read-Host "Enter full path to TimeTrackAgent.Watchdog.exe"
+$UIAppPath = Read-Host "Enter full path to TimeTrackAgent.UI.exe"
+
+# Create shared config directory
+$ConfigDir = "C:\\ProgramData\\TimeTrackAgent"
+if (!(Test-Path $ConfigDir)) {
+    New-Item -ItemType Directory -Path $ConfigDir -Force | Out-Null
+}
+
+# Copy appsettings.json to shared location
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+Copy-Item "$ScriptDir\\appsettings.json" "$ConfigDir\\appsettings.json" -Force
+Write-Host "Config copied to $ConfigDir\\appsettings.json" -ForegroundColor Yellow
+Write-Host "IMPORTANT: Edit $ConfigDir\\appsettings.json and set the employee's User ID" -ForegroundColor Yellow
 
 # Install main agent service
 sc.exe create TimeTrackAgent binPath= "$AgentPath" start= auto obj= LocalSystem displayname= "TimeTrack Agent"
@@ -91,12 +104,23 @@ sc.exe description TimeTrackAgent "Employee time tracking and monitoring agent"
 sc.exe create TimeTrackWatchdog binPath= "$WatchdogPath" start= auto obj= LocalSystem displayname= "TimeTrack Watchdog"
 sc.exe description TimeTrackWatchdog "Monitors and auto-restarts the TimeTrack Agent"
 
-# Start both services
+# Set UI app to auto-start at user login (all users)
+$RegPath = "HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run"
+Set-ItemProperty -Path $RegPath -Name "TimeTrackUI" -Value """$UIAppPath"""
+Write-Host "UI app registered for auto-start at login" -ForegroundColor Cyan
+
+# Start services
 sc.exe start TimeTrackAgent
 sc.exe start TimeTrackWatchdog
 
+# Start UI app for current user
+Start-Process -FilePath $UIAppPath
+
 Write-Host ""
-Write-Host "Both services installed and started successfully!" -ForegroundColor Green
+Write-Host "Installation complete!" -ForegroundColor Green
+Write-Host "  Services: TimeTrackAgent + TimeTrackWatchdog (running)" -ForegroundColor Green
+Write-Host "  UI App: Will auto-start at every user login" -ForegroundColor Green
+Write-Host ""
 Write-Host "Verify with: sc.exe query TimeTrackAgent" -ForegroundColor Cyan
 `;
 
@@ -106,26 +130,55 @@ Write-Host "Verify with: sc.exe query TimeTrackAgent" -ForegroundColor Cyan
 1. PREREQUISITES
    - Windows 10/11 or Windows Server 2016+
    - .NET 8 Runtime (download from https://dotnet.microsoft.com/download/dotnet/8.0)
+   - .NET 8 Desktop Runtime (for UI app)
 
-2. CONFIGURE
-   - Open appsettings.json
+2. ARCHITECTURE
+   The agent consists of three components:
+   
+   a) TimeTrackAgent (Windows Service)
+      - Runs as LocalSystem, always active
+      - Detects idle time, captures screenshots
+      - Auto punches-out on idle/lock, sends heartbeats
+   
+   b) TimeTrackAgent.Watchdog (Windows Service)
+      - Monitors the main agent and auto-restarts if stopped
+   
+   c) TimeTrackAgent.UI (Desktop Tray App)
+      - Runs in the user's session (auto-starts at login)
+      - Shows forced popup on unlock/login for:
+        * Day start: "What will you be working on?" → Punch In
+        * Return from break: Select break label or type reason → Punch In
+      - Cannot be closed or bypassed by the employee
+
+3. CONFIGURE
+   - Open appsettings.json (or C:\\ProgramData\\TimeTrackAgent\\appsettings.json after install)
    - The API URL and API Key are pre-filled
    - Replace "REPLACE_WITH_EMPLOYEE_USER_ID" with the employee's User ID
      (found in the admin dashboard under Employees)
 
-3. BUILD (if building from source)
+4. BUILD (if building from source)
    dotnet publish TimeTrackAgent -c Release -o ./publish/agent
    dotnet publish TimeTrackAgent.Watchdog -c Release -o ./publish/watchdog
+   dotnet publish TimeTrackAgent.UI -c Release -o ./publish/ui
 
-4. INSTALL
+5. INSTALL
    - Run install.ps1 as Administrator
    - Or manually run the sc.exe commands inside the script
 
-5. VERIFY
+6. VERIFY
    sc.exe query TimeTrackAgent
    sc.exe query TimeTrackWatchdog
 
 Both services should show "RUNNING".
+The UI tray app will appear in the system tray.
+
+7. HOW IT WORKS
+   - Employee logs in → UI popup: "Start Your Workday" → Punch In
+   - Employee goes idle for 10 min → Agent punches out & locks screen
+   - Employee returns and unlocks → UI popup: "What were you doing?" 
+     → Select break label → Punch In
+   - All punch-in/out, breaks, screenshots, and idle events are tracked
+     and visible in the admin dashboard
 
 For enterprise deployment (MSI, GPO, Intune), see the full README.md
 in the windows-agent source folder.

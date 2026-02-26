@@ -35,6 +35,12 @@ public class ApiClient
 
     public async Task<bool> SendAsync(string action, object? data = null)
     {
+        var response = await SendWithResponseAsync<object>(action, data);
+        return response != null;
+    }
+
+    public async Task<T?> SendWithResponseAsync<T>(string action, object? data = null) where T : class
+    {
         var payload = new ApiPayload
         {
             Action = action,
@@ -51,7 +57,16 @@ public class ApiClient
                 if (response.IsSuccessStatusCode)
                 {
                     _logger.LogDebug("API call '{Action}' succeeded (attempt {Attempt})", action, attempt);
-                    return true;
+
+                    try
+                    {
+                        var body = await response.Content.ReadFromJsonAsync<ApiResponseWrapper<T>>(_jsonOptions);
+                        return body?.Data;
+                    }
+                    catch
+                    {
+                        return null;
+                    }
                 }
 
                 _logger.LogWarning("API call '{Action}' returned {Status} (attempt {Attempt})",
@@ -67,6 +82,12 @@ public class ApiClient
         }
 
         _logger.LogError("API call '{Action}' failed after 3 attempts", action);
-        return false;
+        return null;
     }
+}
+
+public class ApiResponseWrapper<T>
+{
+    public bool Success { get; set; }
+    public T? Data { get; set; }
 }
