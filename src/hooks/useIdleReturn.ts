@@ -6,13 +6,11 @@ export function useIdleReturn(attendanceId: string | null) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  // Check for idle events that need a return reason
   const pendingIdleEvent = useQuery({
     queryKey: ["idle_return", user?.id, attendanceId],
     enabled: !!user && !!attendanceId,
     refetchInterval: 10000,
     queryFn: async () => {
-      // Find idle events on this attendance that ended but have no return reason
       const { data, error } = await supabase
         .from("idle_events")
         .select("*")
@@ -29,15 +27,48 @@ export function useIdleReturn(attendanceId: string | null) {
   });
 
   const submitReturnReason = useMutation({
-    mutationFn: async ({ eventId, reason }: { eventId: string; reason: string }) => {
-      const { error } = await supabase
+    mutationFn: async ({
+      eventId,
+      reason,
+      breakTypeId,
+      customReason,
+      attendanceId: attId,
+      durationMinutes,
+    }: {
+      eventId: string;
+      reason: string;
+      breakTypeId: string | null;
+      customReason: string | null;
+      attendanceId: string;
+      durationMinutes: number | null;
+    }) => {
+      // Update idle event with return reason
+      const { error: idleError } = await supabase
         .from("idle_events")
         .update({ return_reason: reason } as any)
         .eq("id", eventId);
-      if (error) throw error;
+      if (idleError) throw idleError;
+
+      // Create a break log entry
+      const breakLog: any = {
+        user_id: user!.id,
+        attendance_id: attId,
+        status: "completed",
+        ended_at: new Date().toISOString(),
+      };
+      if (breakTypeId) {
+        breakLog.break_type_id = breakTypeId;
+      } else {
+        breakLog.custom_reason = customReason;
+      }
+      const { error: breakError } = await supabase
+        .from("break_logs")
+        .insert(breakLog);
+      if (breakError) throw breakError;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["idle_return"] });
+      queryClient.invalidateQueries({ queryKey: ["break_logs"] });
     },
   });
 

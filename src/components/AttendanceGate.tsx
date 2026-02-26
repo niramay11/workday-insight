@@ -1,11 +1,15 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useAttendance } from "@/hooks/useAttendance";
 import { useIdleReturn } from "@/hooks/useIdleReturn";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import { BreakSchedule } from "@/components/BreakSchedule";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LogIn, Clock, AlertTriangle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
@@ -15,16 +19,31 @@ interface AttendanceGateProps {
 }
 
 export function AttendanceGate({ children }: AttendanceGateProps) {
+  const { user } = useAuth();
   const { activeSession, punchIn, todayTotalHours } = useAttendance();
   const [currentTask, setCurrentTask] = useState("");
-  const [returnReason, setReturnReason] = useState("");
+  const [selectedBreakType, setSelectedBreakType] = useState("");
+  const [customReason, setCustomReason] = useState("");
 
   const session = activeSession.data;
   const { pendingIdleEvent, submitReturnReason, hasPendingReturn } = useIdleReturn(session?.id ?? null);
 
+  // Fetch break types for the idle return form
+  const { data: breakTypes } = useQuery({
+    queryKey: ["break_types"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("break_types")
+        .select("*")
+        .eq("is_active", true)
+        .order("created_at");
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const isLoading = activeSession.isLoading;
 
-  // If loading, show spinner
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -33,9 +52,12 @@ export function AttendanceGate({ children }: AttendanceGateProps) {
     );
   }
 
-  // If there's a pending idle return, show return reason form
+  // If there's a pending idle return, show break categorization form
   if (session && hasPendingReturn) {
     const idleEvent = pendingIdleEvent.data;
+    const isOther = selectedBreakType === "other";
+    const canSubmit = selectedBreakType && (!isOther || customReason.trim());
+
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="w-full max-w-lg border-0 shadow-lg">
@@ -49,31 +71,64 @@ export function AttendanceGate({ children }: AttendanceGateProps) {
               {idleEvent?.duration_minutes
                 ? `${Math.round(Number(idleEvent.duration_minutes))} minutes`
                 : "a while"}
-              . Please explain your absence before continuing.
+              . Please categorize your break before continuing.
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Reason for absence *</Label>
-              <Textarea
-                value={returnReason}
-                onChange={(e) => setReturnReason(e.target.value)}
-                placeholder="e.g., Had a meeting, went for lunch, took a break..."
-                rows={3}
-              />
+            <div className="space-y-3">
+              <Label>What type of break was this? *</Label>
+              <RadioGroup value={selectedBreakType} onValueChange={setSelectedBreakType}>
+                {breakTypes?.map((bt) => (
+                  <div key={bt.id} className="flex items-center space-x-2 p-2 rounded-lg hover:bg-muted/50">
+                    <RadioGroupItem value={bt.id} id={bt.id} />
+                    <Label htmlFor={bt.id} className="cursor-pointer font-normal">
+                      {bt.name}
+                    </Label>
+                  </div>
+                ))}
+                <div className="flex items-center space-x-2 p-2 rounded-lg hover:bg-muted/50">
+                  <RadioGroupItem value="other" id="other" />
+                  <Label htmlFor="other" className="cursor-pointer font-normal">
+                    Other (meeting, conference, etc.)
+                  </Label>
+                </div>
+              </RadioGroup>
             </div>
+
+            {isOther && (
+              <div className="space-y-2">
+                <Label>Please specify *</Label>
+                <Textarea
+                  value={customReason}
+                  onChange={(e) => setCustomReason(e.target.value)}
+                  placeholder="e.g., Client meeting, Conference call, Personal errand..."
+                  rows={2}
+                />
+              </div>
+            )}
+
             <Button
               className="w-full"
-              disabled={!returnReason.trim() || submitReturnReason.isPending}
+              disabled={!canSubmit || submitReturnReason.isPending}
               onClick={async () => {
                 if (!idleEvent) return;
+                const breakTypeId = isOther ? null : selectedBreakType;
+                const reason = isOther
+                  ? customReason.trim()
+                  : breakTypes?.find((bt) => bt.id === selectedBreakType)?.name ?? "";
+
                 try {
                   await submitReturnReason.mutateAsync({
                     eventId: idleEvent.id,
-                    reason: returnReason.trim(),
+                    reason,
+                    breakTypeId,
+                    customReason: isOther ? customReason.trim() : null,
+                    attendanceId: session.id,
+                    durationMinutes: idleEvent.duration_minutes ? Number(idleEvent.duration_minutes) : null,
                   });
-                  toast({ title: "Welcome back!", description: "You can continue working." });
-                  setReturnReason("");
+                  toast({ title: "Welcome back!", description: "Break logged. You can continue working." });
+                  setSelectedBreakType("");
+                  setCustomReason("");
                 } catch {
                   toast({ title: "Error", variant: "destructive" });
                 }
@@ -141,7 +196,6 @@ export function AttendanceGate({ children }: AttendanceGateProps) {
           </CardContent>
         </Card>
 
-        {/* Show break schedule on the gate */}
         <BreakSchedule />
       </div>
     </div>

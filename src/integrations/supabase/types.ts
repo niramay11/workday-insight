@@ -122,8 +122,9 @@ export type Database = {
       break_logs: {
         Row: {
           attendance_id: string
-          break_type_id: string
+          break_type_id: string | null
           created_at: string
+          custom_reason: string | null
           ended_at: string | null
           id: string
           started_at: string
@@ -132,8 +133,9 @@ export type Database = {
         }
         Insert: {
           attendance_id: string
-          break_type_id: string
+          break_type_id?: string | null
           created_at?: string
+          custom_reason?: string | null
           ended_at?: string | null
           id?: string
           started_at?: string
@@ -142,8 +144,9 @@ export type Database = {
         }
         Update: {
           attendance_id?: string
-          break_type_id?: string
+          break_type_id?: string | null
           created_at?: string
+          custom_reason?: string | null
           ended_at?: string | null
           id?: string
           started_at?: string
@@ -170,30 +173,30 @@ export type Database = {
       break_types: {
         Row: {
           created_at: string
-          duration_minutes: number
-          end_time: string
+          duration_minutes: number | null
+          end_time: string | null
           id: string
           is_active: boolean
           name: string
-          start_time: string
+          start_time: string | null
         }
         Insert: {
           created_at?: string
-          duration_minutes: number
-          end_time: string
+          duration_minutes?: number | null
+          end_time?: string | null
           id?: string
           is_active?: boolean
           name: string
-          start_time: string
+          start_time?: string | null
         }
         Update: {
           created_at?: string
-          duration_minutes?: number
-          end_time?: string
+          duration_minutes?: number | null
+          end_time?: string | null
           id?: string
           is_active?: boolean
           name?: string
-          start_time?: string
+          start_time?: string | null
         }
         Relationships: []
       }

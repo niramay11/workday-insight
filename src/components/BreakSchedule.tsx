@@ -1,86 +1,52 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useAttendance } from "@/hooks/useAttendance";
-import { Button } from "@/components/ui/button";
+import { useSettings } from "@/hooks/useSettings";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Coffee, Play, Square } from "lucide-react";
-import { toast } from "@/hooks/use-toast";
+import { Progress } from "@/components/ui/progress";
+import { Coffee, Clock } from "lucide-react";
 
 export function BreakSchedule() {
   const { user } = useAuth();
   const { activeSession } = useAttendance();
-  const queryClient = useQueryClient();
+  const { settings } = useSettings();
   const attendanceId = activeSession.data?.id;
-
-  const { data: breakTypes } = useQuery({
-    queryKey: ["break_types"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("break_types")
-        .select("*")
-        .eq("is_active", true)
-        .order("start_time");
-      if (error) throw error;
-      return data;
-    },
-  });
+  const allowance = Number(settings.data?.daily_break_allowance_minutes || 75);
 
   const { data: todayBreakLogs } = useQuery({
     queryKey: ["break_logs", "today", user?.id],
-    enabled: !!user && !!attendanceId,
+    enabled: !!user,
     queryFn: async () => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
       const { data, error } = await supabase
         .from("break_logs")
-        .select("*")
+        .select("*, break_types(name)")
         .eq("user_id", user!.id)
-        .eq("attendance_id", attendanceId!);
+        .gte("started_at", today.toISOString())
+        .order("started_at", { ascending: false });
       if (error) throw error;
       return data;
     },
   });
 
-  const startBreak = useMutation({
-    mutationFn: async (breakTypeId: string) => {
-      const { error } = await supabase.from("break_logs").insert({
-        user_id: user!.id,
-        break_type_id: breakTypeId,
-        attendance_id: attendanceId!,
-        status: "active",
-      });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["break_logs"] });
-      toast({ title: "Break started" });
-    },
-    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
-  });
+  // Calculate total break minutes used today
+  const totalMinutes = (todayBreakLogs ?? []).reduce((sum, log) => {
+    if (!log.ended_at) return sum;
+    const start = new Date(log.started_at).getTime();
+    const end = new Date(log.ended_at).getTime();
+    return sum + (end - start) / 60000;
+  }, 0);
 
-  const endBreak = useMutation({
-    mutationFn: async (breakLogId: string) => {
-      const { error } = await supabase
-        .from("break_logs")
-        .update({ ended_at: new Date().toISOString(), status: "completed" })
-        .eq("id", breakLogId);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["break_logs"] });
-      toast({ title: "Break ended" });
-    },
-    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
-  });
+  const usedMinutes = Math.round(totalMinutes);
+  const percentage = Math.min((usedMinutes / allowance) * 100, 100);
+  const isOverLimit = usedMinutes > allowance;
 
-  if (!breakTypes?.length) return null;
-
-  const formatTime = (t: string) => {
-    const [h, m] = t.split(":");
-    const hour = parseInt(h);
-    const ampm = hour >= 12 ? "PM" : "AM";
-    const h12 = hour % 12 || 12;
-    return `${h12}:${m} ${ampm}`;
+  const formatDuration = (mins: number) => {
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
   };
 
   return (
@@ -90,60 +56,50 @@ export function BreakSchedule() {
           <Coffee className="h-5 w-5" /> Today's Breaks
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-3">
-          {breakTypes.map((bt) => {
-            const log = todayBreakLogs?.find(
-              (l) => l.break_type_id === bt.id && l.status === "active"
-            );
-            const completed = todayBreakLogs?.find(
-              (l) => l.break_type_id === bt.id && l.status === "completed"
-            );
-
-            return (
-              <div
-                key={bt.id}
-                className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
-              >
-                <div>
-                  <p className="font-medium text-sm">{bt.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatTime(bt.start_time)} – {formatTime(bt.end_time)} · {bt.duration_minutes} min
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  {completed ? (
-                    <Badge variant="outline" className="bg-[hsl(var(--success))]/10 text-[hsl(var(--success))]">
-                      Done
-                    </Badge>
-                  ) : log ? (
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => endBreak.mutate(log.id)}
-                      disabled={endBreak.isPending}
-                    >
-                      <Square className="mr-1 h-3 w-3" /> End
-                    </Button>
-                  ) : attendanceId ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => startBreak.mutate(bt.id)}
-                      disabled={startBreak.isPending}
-                    >
-                      <Play className="mr-1 h-3 w-3" /> Start
-                    </Button>
-                  ) : (
-                    <Badge variant="outline" className="text-muted-foreground">
-                      Punch in first
-                    </Badge>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+      <CardContent className="space-y-4">
+        {/* Usage summary */}
+        <div className="space-y-2">
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">Break time used</span>
+            <span className={isOverLimit ? "text-destructive font-medium" : "font-medium"}>
+              {formatDuration(usedMinutes)} / {formatDuration(allowance)}
+            </span>
+          </div>
+          <Progress value={percentage} className="h-2" />
+          {isOverLimit && (
+            <p className="text-xs text-destructive">
+              Over limit by {formatDuration(usedMinutes - allowance)}
+            </p>
+          )}
         </div>
+
+        {/* Break list */}
+        {todayBreakLogs?.length ? (
+          <div className="space-y-2">
+            {todayBreakLogs.map((log) => {
+              const label = (log as any).break_types?.name || log.custom_reason || "Break";
+              const start = new Date(log.started_at);
+              const end = log.ended_at ? new Date(log.ended_at) : null;
+              const mins = end ? Math.round((end.getTime() - start.getTime()) / 60000) : null;
+
+              return (
+                <div key={log.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-sm">{label}</span>
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    {mins != null ? `${mins}m` : "Active"}
+                    {" · "}
+                    {start.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground text-center py-2">No breaks taken yet today</p>
+        )}
       </CardContent>
     </Card>
   );
