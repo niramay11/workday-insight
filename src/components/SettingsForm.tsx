@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { useSettings } from "@/hooks/useSettings";
 import { useAuth } from "@/hooks/useAuth";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
-import { Copy, RefreshCw, Save, Shield, Clock, Eye, EyeOff, Camera, Bell, Palette, Download, Loader2 } from "lucide-react";
+import { Copy, RefreshCw, Save, Shield, Clock, Eye, EyeOff, Camera, Bell, Palette, Download, Loader2, Coffee, Plus, Trash2 } from "lucide-react";
 import { useTheme } from "next-themes";
 
 export function SettingsForm() {
@@ -267,6 +269,138 @@ export function SettingsForm() {
           </div>
         </CardContent>
       </Card>
+      {/* Break Management */}
+      <BreakManagement />
     </div>
+  );
+}
+
+function BreakManagement() {
+  const queryClient = useQueryClient();
+  const [name, setName] = useState("");
+  const [startTime, setStartTime] = useState("13:00");
+  const [endTime, setEndTime] = useState("13:30");
+  const [duration, setDuration] = useState("30");
+
+  const { data: breakTypes, isLoading } = useQuery({
+    queryKey: ["break_types_admin"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("break_types").select("*").order("start_time");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const addBreak = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("break_types").insert({
+        name: name.trim(),
+        start_time: startTime,
+        end_time: endTime,
+        duration_minutes: parseInt(duration),
+        is_active: true,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["break_types_admin"] });
+      queryClient.invalidateQueries({ queryKey: ["break_types"] });
+      setName("");
+      toast({ title: "Break type added" });
+    },
+    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+  });
+
+  const deleteBreak = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("break_types").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["break_types_admin"] });
+      queryClient.invalidateQueries({ queryKey: ["break_types"] });
+      toast({ title: "Break type removed" });
+    },
+    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+  });
+
+  const formatTime = (t: string) => {
+    const [h, m] = t.split(":");
+    const hour = parseInt(h);
+    const ampm = hour >= 12 ? "PM" : "AM";
+    const h12 = hour % 12 || 12;
+    return `${h12}:${m} ${ampm}`;
+  };
+
+  return (
+    <Card className="border-0 shadow-sm">
+      <CardHeader>
+        <CardTitle className="text-lg flex items-center gap-2">
+          <Coffee className="h-5 w-5" /> Break Management
+        </CardTitle>
+        <CardDescription>Define scheduled breaks that employees can track</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Existing breaks */}
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        ) : breakTypes?.length ? (
+          <div className="space-y-2">
+            {breakTypes.map((bt) => (
+              <div key={bt.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                <div>
+                  <p className="font-medium text-sm">{bt.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {formatTime(bt.start_time)} – {formatTime(bt.end_time)} · {bt.duration_minutes} min
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-destructive"
+                  onClick={() => deleteBreak.mutate(bt.id)}
+                  disabled={deleteBreak.isPending}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">No breaks configured yet.</p>
+        )}
+
+        {/* Add new break */}
+        <div className="border-t pt-4 space-y-3">
+          <p className="text-sm font-medium">Add Break Type</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Name</Label>
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., Lunch Break" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Duration (minutes)</Label>
+              <Input type="number" value={duration} onChange={(e) => setDuration(e.target.value)} min={5} max={120} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Start Time</Label>
+              <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">End Time</Label>
+              <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+            </div>
+          </div>
+          <Button
+            onClick={() => addBreak.mutate()}
+            disabled={!name.trim() || addBreak.isPending}
+          >
+            <Plus className="mr-2 h-4 w-4" /> Add Break
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

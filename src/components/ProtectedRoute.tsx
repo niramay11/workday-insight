@@ -1,8 +1,9 @@
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { AttendanceGate } from "@/components/AttendanceGate";
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { session, loading } = useAuth();
+  const { session, loading, role } = useAuth();
 
   if (loading) {
     return (
@@ -14,6 +15,11 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (!session) {
     return <Navigate to="/auth" replace />;
+  }
+
+  // Employees must punch in before accessing the app
+  if (role === "employee") {
+    return <AttendanceGate>{children}</AttendanceGate>;
   }
 
   return <>{children}</>;
