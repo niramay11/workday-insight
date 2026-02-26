@@ -32,6 +32,15 @@ const Employees = () => {
   const [editRole, setEditRole] = useState<AppRole>("employee");
   const [editStatus, setEditStatus] = useState<string>("active");
 
+  // Invite employee state
+  const [showInvite, setShowInvite] = useState(false);
+  const [inviteName, setInviteName] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteDept, setInviteDept] = useState("none");
+  const [inviteRole, setInviteRole] = useState<AppRole>("employee");
+  const [inviteResult, setInviteResult] = useState<{ email: string; temp_password: string } | null>(null);
+  const [inviting, setInviting] = useState(false);
+
   if (role !== "admin") return <Navigate to="/dashboard" replace />;
 
   const { data: employees, isLoading } = useQuery({
@@ -143,6 +152,7 @@ const Employees = () => {
   };
 
   return (
+    <>
     <AppLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -154,6 +164,9 @@ const Employees = () => {
               {employees?.length ?? 0} total employees
             </p>
           </div>
+          <Button onClick={() => { setShowInvite(true); setInviteResult(null); setInviteName(""); setInviteEmail(""); setInviteDept("none"); setInviteRole("employee"); }}>
+            <UserPlus className="mr-2 h-4 w-4" /> Invite Employee
+          </Button>
         </div>
 
         {/* Filters */}
@@ -260,6 +273,7 @@ const Employees = () => {
           </Card>
         )}
       </div>
+    </AppLayout>
 
       {/* Edit Dialog */}
       <Dialog open={!!editingEmployee} onOpenChange={(o) => !o && setEditingEmployee(null)}>
@@ -275,9 +289,7 @@ const Employees = () => {
             <div className="space-y-2">
               <Label>Department</Label>
               <Select value={editDeptId} onValueChange={setEditDeptId}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Unassigned</SelectItem>
                   {departments?.map((d) => (
@@ -289,9 +301,7 @@ const Employees = () => {
             <div className="space-y-2">
               <Label>Role</Label>
               <Select value={editRole} onValueChange={(v) => setEditRole(v as AppRole)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="employee">Employee</SelectItem>
                   <SelectItem value="manager">Manager</SelectItem>
@@ -302,9 +312,7 @@ const Employees = () => {
             <div className="space-y-2">
               <Label>Status</Label>
               <Select value={editStatus} onValueChange={setEditStatus}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="active">Active</SelectItem>
                   <SelectItem value="inactive">Inactive</SelectItem>
@@ -320,7 +328,107 @@ const Employees = () => {
           </div>
         </DialogContent>
       </Dialog>
-    </AppLayout>
+
+      {/* Invite Dialog */}
+      <Dialog open={showInvite} onOpenChange={setShowInvite}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Invite Employee</DialogTitle>
+          </DialogHeader>
+          {inviteResult ? (
+            <div className="space-y-4">
+              <div className="bg-[hsl(var(--success))]/10 border border-[hsl(var(--success))]/20 rounded-lg p-4 space-y-2">
+                <p className="font-medium text-[hsl(var(--success))]">Employee created successfully!</p>
+                <p className="text-sm">Share these credentials with the employee:</p>
+                <div className="space-y-1 font-mono text-sm bg-background rounded p-3">
+                  <p><span className="text-muted-foreground">Email:</span> {inviteResult.email}</p>
+                  <p><span className="text-muted-foreground">Password:</span> {inviteResult.temp_password}</p>
+                </div>
+                <p className="text-xs text-muted-foreground">The employee should change their password after first login.</p>
+              </div>
+              <Button className="w-full" onClick={() => setShowInvite(false)}>Done</Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Full Name *</Label>
+                <Input value={inviteName} onChange={(e) => setInviteName(e.target.value)} placeholder="John Doe" />
+              </div>
+              <div className="space-y-2">
+                <Label>Email *</Label>
+                <Input type="email" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="john@company.com" />
+              </div>
+              <div className="space-y-2">
+                <Label>Department</Label>
+                <Select value={inviteDept} onValueChange={setInviteDept}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Unassigned</SelectItem>
+                    {departments?.map((d) => (
+                      <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Role</Label>
+                <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as AppRole)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="employee">Employee</SelectItem>
+                    <SelectItem value="manager">Manager</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setShowInvite(false)}>Cancel</Button>
+                <Button
+                  disabled={!inviteName.trim() || !inviteEmail.trim() || inviting}
+                  onClick={async () => {
+                    setInviting(true);
+                    try {
+                      const { data: sessionData } = await supabase.auth.getSession();
+                      const token = sessionData?.session?.access_token;
+                      if (!token) throw new Error("Not authenticated");
+                      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+                      const res = await fetch(
+                        `https://${projectId}.supabase.co/functions/v1/invite-employee`,
+                        {
+                          method: "POST",
+                          headers: {
+                            Authorization: `Bearer ${token}`,
+                            "Content-Type": "application/json",
+                          },
+                          body: JSON.stringify({
+                            full_name: inviteName.trim(),
+                            email: inviteEmail.trim(),
+                            department_id: inviteDept === "none" ? null : inviteDept,
+                            role: inviteRole,
+                          }),
+                        }
+                      );
+                      const result = await res.json();
+                      if (!res.ok) throw new Error(result.error || "Failed to invite");
+                      setInviteResult({ email: result.email, temp_password: result.temp_password });
+                      queryClient.invalidateQueries({ queryKey: ["employees"] });
+                      queryClient.invalidateQueries({ queryKey: ["all-roles"] });
+                      toast({ title: "Employee invited successfully" });
+                    } catch (err: any) {
+                      toast({ title: "Error", description: err.message, variant: "destructive" });
+                    } finally {
+                      setInviting(false);
+                    }
+                  }}
+                >
+                  {inviting ? "Creating..." : "Create Employee"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 

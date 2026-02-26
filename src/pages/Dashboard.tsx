@@ -4,6 +4,7 @@ import { useAttendance } from "@/hooks/useAttendance";
 import { PunchButton } from "@/components/PunchButton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Clock, Users, AlertTriangle, Activity } from "lucide-react";
+import { BreakSchedule } from "@/components/BreakSchedule";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -87,6 +88,9 @@ const Dashboard = () => {
             ))}
           </div>
         )}
+
+        {/* Break Schedule */}
+        <BreakSchedule />
       </div>
     </AppLayout>
   );

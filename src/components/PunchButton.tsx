@@ -34,7 +34,7 @@ export function PunchButton() {
         await punchOut.mutateAsync(session.id);
         toast({ title: "Punched out", description: "Session ended successfully." });
       } else {
-        await punchIn.mutateAsync();
+        await punchIn.mutateAsync(undefined);
         toast({ title: "Punched in", description: "Session started. Have a productive day!" });
       }
     } catch {

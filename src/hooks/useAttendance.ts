@@ -39,10 +39,12 @@ export function useAttendance() {
   });
 
   const punchIn = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (currentTask?: string | undefined) => {
+      const insertData: any = { user_id: user!.id, status: "active" };
+      if (currentTask) insertData.current_task = currentTask;
       const { data, error } = await supabase
         .from("attendance_records")
-        .insert({ user_id: user!.id, status: "active" })
+        .insert(insertData)
         .select()
         .single();
       if (error) throw error;

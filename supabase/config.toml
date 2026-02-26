@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.download-agent-config]
 verify_jwt = false
+
+[functions.invite-employee]
+verify_jwt = false

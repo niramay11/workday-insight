@@ -86,6 +86,7 @@ export type Database = {
       attendance_records: {
         Row: {
           created_at: string
+          current_task: string | null
           id: string
           notes: string | null
           punch_in: string
@@ -96,6 +97,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          current_task?: string | null
           id?: string
           notes?: string | null
           punch_in?: string
@@ -106,6 +108,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          current_task?: string | null
           id?: string
           notes?: string | null
           punch_in?: string
@@ -113,6 +116,84 @@ export type Database = {
           status?: string
           total_hours?: number | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      break_logs: {
+        Row: {
+          attendance_id: string
+          break_type_id: string
+          created_at: string
+          ended_at: string | null
+          id: string
+          started_at: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          attendance_id: string
+          break_type_id: string
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          started_at?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          attendance_id?: string
+          break_type_id?: string
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          started_at?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "break_logs_attendance_id_fkey"
+            columns: ["attendance_id"]
+            isOneToOne: false
+            referencedRelation: "attendance_records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "break_logs_break_type_id_fkey"
+            columns: ["break_type_id"]
+            isOneToOne: false
+            referencedRelation: "break_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      break_types: {
+        Row: {
+          created_at: string
+          duration_minutes: number
+          end_time: string
+          id: string
+          is_active: boolean
+          name: string
+          start_time: string
+        }
+        Insert: {
+          created_at?: string
+          duration_minutes: number
+          end_time: string
+          id?: string
+          is_active?: boolean
+          name: string
+          start_time: string
+        }
+        Update: {
+          created_at?: string
+          duration_minutes?: number
+          end_time?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          start_time?: string
         }
         Relationships: []
       }
@@ -147,6 +228,7 @@ export type Database = {
           id: string
           idle_end: string | null
           idle_start: string
+          return_reason: string | null
           source: string
           user_id: string
         }
@@ -156,6 +238,7 @@ export type Database = {
           id?: string
           idle_end?: string | null
           idle_start?: string
+          return_reason?: string | null
           source?: string
           user_id: string
         }
@@ -165,6 +248,7 @@ export type Database = {
           id?: string
           idle_end?: string | null
           idle_start?: string
+          return_reason?: string | null
           source?: string
           user_id?: string
         }
