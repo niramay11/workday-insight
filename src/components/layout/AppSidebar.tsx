@@ -11,6 +11,7 @@ import {
   Timer,
   Activity,
   Monitor,
+  Cpu,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NotificationBell } from "@/components/NotificationBell";
@@ -37,6 +38,7 @@ const navItems = {
     { to: "/monitoring", icon: Monitor, label: "Live Monitor" },
     { to: "/reports", icon: FileBarChart, label: "Reports" },
     { to: "/activity", icon: Activity, label: "Activity Logs" },
+    { to: "/agents", icon: Cpu, label: "Agent Management" },
     { to: "/settings", icon: Settings, label: "Settings" },
   ],
 };

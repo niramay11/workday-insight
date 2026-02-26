@@ -17,6 +17,7 @@ import LiveMonitoring from "./pages/LiveMonitoring";
 import ActivityLogs from "./pages/ActivityLogs";
 import Settings from "./pages/Settings";
 import ResetPassword from "./pages/ResetPassword";
+import AgentManagement from "./pages/AgentManagement";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -42,6 +43,7 @@ const App = () => (
               <Route path="/monitoring" element={<ProtectedRoute><LiveMonitoring /></ProtectedRoute>} />
               <Route path="/activity" element={<ProtectedRoute><ActivityLogs /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+              <Route path="/agents" element={<ProtectedRoute><AgentManagement /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AuthProvider>
